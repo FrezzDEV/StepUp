@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Товар — STEPUP</title>
+<meta name="description" content="Сторінка товару STEPUP.">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="site-header"></div>
+<main class="wrap" id="root"></main>
+<div id="site-footer"></div>
+<script src="js/data.js"></script><script src="js/app.js"></script>
+<script>
+SU.boot(() => {
+  const { $, $$, t } = SU;
+  const root = $("#root");
+  const p = SU.bySlug(new URLSearchParams(location.search).get("slug") || "");
+  if (!p) {
+    document.title = t("not_found") + " — STEPUP";
+    root.innerHTML = `<div class="empty" style="margin:40px 0"><h3>${t("not_found")}</h3><p></p><a class="btn btn-primary" href="catalog.html">${t("back_shop")}</a></div>`;
+    return;
+  }
+  SU.recent.add(p.id);
+  document.title = `${p.brand} ${p.name} — STEPUP`;
+  const setMeta = (sel, attr, val) => { let m = $(sel); if (!m) { m = document.createElement("meta"); const [k, v] = sel.match(/\[(.+?)="(.+?)"\]/).slice(1); m.setAttribute(k, v); document.head.appendChild(m); } m.setAttribute(attr, val); };
+  setMeta('meta[name="description"]', "content", SU.pdesc(p));
+  setMeta('meta[property="og:title"]', "content", `${p.brand} ${p.name}`);
+  const ld = document.createElement("script"); ld.type = "application/ld+json";
+  ld.textContent = JSON.stringify({ "@context": "https://schema.org", "@type": "Product", name: p.name, brand: { "@type": "Brand", name: p.brand }, description: SU.pdesc(p),
+    aggregateRating: { "@type": "AggregateRating", ratingValue: p.rating, reviewCount: p.reviews }, offers: { "@type": "Offer", priceCurrency: "UAH", price: p.price, availability: SU.totalStock(p) ? "https://schema.org/InStock" : "https://schema.org/OutOfStock" } });
+  document.head.appendChild(ld);
+
+  const pct = SU.discountPct(p), total = SU.totalStock(p);
+  const views = ["a", "b"]; let cur = 0, size = null;
+  const sizeCm = { 36: 22.8, 37: 23.5, 38: 24.1, 39: 24.8, 40: 25.4, 41: 26.1, 42: 26.7, 43: 27.4, 44: 28, 45: 28.7, 46: 29.4 };
+  const reviewsHtml = [...SU.REVIEWS].slice(0, 3).map(r => `<div class="review" style="margin-bottom:12px"><span class="demo-note">${t("demo_rev")}</span><div class="stars">${SU.starsHTML(r.rating)}</div><p>${SU.esc(r.text[SU.lang])}</p><small class="muted">${SU.esc(r.name)} · ${SU.date(r.date)}</small></div>`).join("");
+
+  root.innerHTML = `
+  <div class="crumbs"><a href="index.html">${t("home")}</a> / <a href="catalog.html?cat=${p.cat}">${SU.catName(p.cat)}</a> / ${SU.esc(p.name)}</div>
+  <div class="pdp">
+    <div class="gallery">
+      <div class="thumbs">${views.map((v, i) => `<button data-th="${i}" class="${i ? "" : "on"}" aria-label="${SU.esc(p.name)} ${i + 1}">${SU.shoe(p, v === "a" ? undefined : "b")}</button>`).join("")}</div>
+      <div class="stage" id="stage" aria-label="Zoom"><div class="badges">${p.isNew ? `<span class="pill new">${t("new")}</span>` : ""}${p.best ? `<span class="pill best">${t("best")}</span>` : ""}${pct ? `<span class="pill sale">−${pct}%</span>` : ""}</div><span id="stage-img">${SU.shoe(p)}</span></div>
+    </div>
+    <div>
+      <div class="brand">${SU.esc(p.brand)}</div>
+      <h1>${SU.esc(p.name)}</h1>
+      <div class="rate"><span class="stars">${SU.starsHTML(p.rating)}</span><b>${p.rating}</b><a href="#reviews" class="muted" style="text-decoration:underline">${p.reviews} ${t("reviews").toLowerCase()}</a></div>
+      <div class="price">${SU.money(p.price)}${p.old ? `<s>${SU.money(p.old)}</s><em>−${pct}% (−${SU.money(p.old - p.price)})</em>` : ""}</div>
+      <p class="muted" style="margin-top:12px">${SU.esc(SU.pdesc(p))}</p>
+      <div class="stock ${total ? "in" : "out"}">● ${total ? t("in_stock") : t("out_stock")}</div>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">${p.colors.map(c => `<span title="${SU.colorName(c)}" style="width:22px;height:22px;border-radius:50%;background:${SU.COLORS[c]};border:1px solid var(--line)"></span>`).join("")}<span class="muted" style="font-size:.9rem">${SU.colorName(p.colors[0])}</span></div>
+      <div class="size-head"><span>${t("size")} <span id="chosen" class="muted"></span></span><button id="guide">${t("size_guide")}</button></div>
+      <div class="sizes" id="sizes">${Object.entries(p.sizes).map(([s, q]) => `<button data-s="${s}" ${q ? "" : "disabled"} title="${q ? "" : t("out_stock")}">${s}</button>`).join("")}</div>
+      <div class="muted" style="font-size:.82rem">${t("size_unavail")}</div>
+      <div class="err" id="err" role="alert"></div>
+      <div class="buy"><button class="btn btn-primary" id="add" ${total ? "" : "disabled"}>${t("add")}</button><button class="heart ${SU.favs.has(p.id) ? "on" : ""}" data-fav="${p.id}" aria-label="${t("to_fav")}">${SU.icon.heart}</button></div>
+      <button class="btn btn-accent btn-block" id="buy" style="margin-top:10px;min-height:54px" ${total ? "" : "disabled"}>${t("buy_now")}</button>
+      <div style="margin-top:28px">
+        <details open><summary>${t("desc")}</summary><div>${SU.esc(SU.pdesc(p))}</div></details>
+        <details><summary>${t("specs")}</summary><div><table class="t"><tr><th>${t("brand")}</th><td>${SU.esc(p.brand)}</td></tr><tr><th>${t("category")}</th><td>${SU.catName(p.cat)}</td></tr><tr><th>${t("color")}</th><td>${p.colors.map(SU.colorName).join(", ")}</td></tr><tr><th>SKU</th><td>SU-${String(p.id).padStart(4, "0")}</td></tr></table></div></details>
+        <details id="sz"><summary>${t("size_guide")}</summary><div><table class="t"><tr><th>${t("eu")}</th><th>${t("cm")}</th></tr>${Object.keys(sizeCm).map(s => `<tr><td>${s}</td><td>${sizeCm[s]}</td></tr>`).join("")}</table></div></details>
+        <details><summary>${t("ship_ret")}</summary><div>${t("b2d")} ${t("b5d")} <a href="delivery.html" style="text-decoration:underline">${t("delivery")}</a> · <a href="returns.html" style="text-decoration:underline">${t("returns")}</a></div></details>
+        <details id="reviews"><summary>${t("reviews")} (${p.reviews})</summary><div>${reviewsHtml}</div></details>
+      </div>
+    </div>
+  </div>
+  <section class="block" style="padding-top:24px"><div class="sec-head"><h2>${t("similar")}</h2></div><div class="grid" id="sim"></div></section>
+  <section class="block" style="padding-top:0" id="recent-sec"><div class="sec-head"><h2>${t("recent")}</h2></div><div class="grid" id="recent"></div></section>`;
+
+  $("#sim").innerHTML = SU.PRODUCTS.filter(x => x.id !== p.id && x.cat === p.cat).sort((a, b) => b.pop - a.pop).slice(0, 4).map(SU.card).join("");
+  const rec = SU.recent.get().filter(id => id !== p.id).map(SU.byId).filter(Boolean).slice(0, 4);
+  if (rec.length) $("#recent").innerHTML = rec.map(SU.card).join(""); else $("#recent-sec").remove();
+
+  // gallery
+  $$("[data-th]").forEach(b => b.onclick = () => { cur = +b.dataset.th; $("#stage-img").innerHTML = SU.shoe(p, cur ? "b" : undefined); $$("[data-th]").forEach(x => x.classList.toggle("on", x === b)); });
+  const stage = $("#stage");
+  stage.onclick = () => stage.classList.toggle("zoom");
+  stage.onmousemove = e => { if (!stage.classList.contains("zoom")) return; const r = stage.getBoundingClientRect(); const svg = $("svg", stage); svg.style.transformOrigin = `${(e.clientX - r.left) / r.width * 100}% ${(e.clientY - r.top) / r.height * 100}%`; };
+  stage.onmouseleave = () => stage.classList.remove("zoom");
+
+  // size selection
+  $("#sizes").onclick = e => {
+    const b = e.target.closest("[data-s]"); if (!b || b.disabled) return;
+    size = b.dataset.s; $$("#sizes button").forEach(x => x.classList.toggle("on", x === b));
+    $("#chosen").textContent = "— " + size; $("#err").textContent = "";
+    const left = p.sizes[size]; if (left <= 2) $("#err").textContent = t("only_left") + ": " + left + " " + t("pcs");
+  };
+  $("#guide").onclick = () => { const d = $("#sz"); d.open = true; d.scrollIntoView({ behavior: "smooth", block: "center" }); };
+
+  const tryAdd = () => {
+    const r = SU.cart.add(p.id, size);
+    if (!r.ok) { $("#err").textContent = r.err === "size" ? t("pick_size") : t("stock_warn"); return false; }
+    return true;
+  };
+  $("#add").onclick = () => { if (tryAdd()) { SU.toast(t("added"), "ok", { href: "cart.html", text: t("go_cart") }); SU.bumpCart(); } };
+  $("#buy").onclick = () => { if (tryAdd()) location.href = "checkout.html"; };
+});
+</script>
+</body>
+</html>

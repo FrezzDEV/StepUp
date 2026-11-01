@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Реєстрація — STEPUP</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="site-header"></div>
+<main class="wrap page"><div class="auth">
+  <h1 data-i18n="register"></h1><p class="muted" style="margin-bottom:24px"> </p>
+  <form class="form" id="f" novalidate>
+    <div class="fld"><label for="nm" data-i18n="name"></label><input id="nm" autocomplete="name"><div class="field-err"></div></div>
+    <div class="fld"><label for="em" data-i18n="email"></label><input id="em" type="email" autocomplete="email"><div class="field-err"></div></div>
+    <div class="fld"><label for="pw" data-i18n="pass"></label><input id="pw" type="password" autocomplete="new-password"><div class="field-err"></div></div>
+    <button class="btn btn-primary btn-block" data-i18n="register"></button>
+  </form>
+  <p style="margin-top:20px;text-align:center"><span class="muted" data-i18n="have_acc"></span> <a href="login.html" style="font-weight:700;text-decoration:underline" data-i18n="login"></a></p>
+</div></main>
+<div id="site-footer"></div>
+<script src="js/data.js"></script><script src="js/app.js"></script>
+<script>
+SU.boot(() => {
+  const { $, t } = SU;
+  const bad = (el, m) => { el.closest(".fld").classList.toggle("bad", !!m); $(".field-err", el.closest(".fld")).textContent = m || ""; return !m; };
+  $("#f").onsubmit = async e => {
+    e.preventDefault();
+    const nm = $("#nm").value.trim(), em = $("#em").value.trim().toLowerCase(), pw = $("#pw").value;
+    const a = bad($("#nm"), nm ? "" : t("req")), b = bad($("#em"), /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em) ? "" : t("email_bad")), c = bad($("#pw"), pw.length >= 8 ? "" : t("pass_short"));
+    if (!(a && b && c)) return;
+    const all = SU.users.all();
+    if (all.some(u => u.email === em)) { bad($("#em"), t("email_taken")); return; }
+    const u = { id: "u-" + Date.now().toString(36), name: nm, email: em, phone: "", role: "customer", hash: await SU.sha(pw), created: Date.now(), addresses: [] };
+    SU.users.save([...all, u]); SU.users.login(u.id);
+    location.href = "account.html";
+  };
+});
+</script>
+</body>
+</html>

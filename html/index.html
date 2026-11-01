@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>STEPUP — Твій стиль. Твій крок.</title>
+<meta name="description" content="STEPUP — сучасний інтернет-магазин взуття: кросівки, спортивне, класичне взуття та черевики.">
+<meta property="og:title" content="STEPUP — онлайн-магазин взуття"><meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="site-header"></div>
+<main>
+  <section class="hero"><div class="wrap">
+    <div>
+      <span class="tag" data-i18n="hero_tag"></span>
+      <h1><span data-i18n="hero_h1a"></span><br><span data-i18n="hero_h1b"></span></h1>
+      <p data-i18n="hero_sub"></p>
+      <div class="cta"><a class="btn btn-primary" href="catalog.html" data-i18n="hero_c1"></a><a class="btn btn-ghost" href="catalog.html?new=1" data-i18n="hero_c2"></a></div>
+    </div>
+    <div class="hero-art" id="hero-art"><div class="disc"></div></div>
+  </div></section>
+
+  <section class="block"><div class="wrap">
+    <div class="sec-head"><h2 data-i18n="cats_t"></h2></div>
+    <div class="cats" id="cats"></div>
+  </div></section>
+
+  <section class="block" style="padding-top:0"><div class="wrap">
+    <div class="sec-head"><h2 data-i18n="best_t"></h2><a class="link-arrow" href="catalog.html?sort=pop" data-i18n="all"></a></div>
+    <div class="grid" id="best"></div>
+  </div></section>
+
+  <section class="block" style="padding-top:0"><div class="wrap">
+    <div class="banner">
+      <div class="txt"><span class="pill new" data-i18n="new"></span><h2 style="margin-top:16px" data-i18n="newcol_h"></h2><p data-i18n="newcol_p"></p><a class="btn btn-accent" href="catalog.html?new=1" data-i18n="hero_c2"></a></div>
+      <div class="art" id="newart"></div>
+    </div>
+  </div></section>
+
+  <section class="block" style="padding-top:0"><div class="wrap">
+    <div class="sec-head"><h2 data-i18n="sale_t"></h2><a class="link-arrow" href="catalog.html?sale=1" data-i18n="all"></a></div>
+    <div class="grid" id="sale"></div>
+  </div></section>
+
+  <section class="block" style="padding-top:0"><div class="wrap">
+    <div class="sec-head"><h2 data-i18n="ben_t"></h2></div>
+    <div class="benefits" id="benefits"></div>
+  </div></section>
+
+  <section class="block" style="padding-top:0"><div class="wrap">
+    <div class="sec-head"><h2 data-i18n="rev_t"></h2></div>
+    <div class="reviews" id="reviews"></div>
+  </div></section>
+
+  <section style="padding-top:0"><div class="wrap">
+    <div class="news">
+      <div><h2 data-i18n="news_t"></h2><p style="margin-top:10px" data-i18n="news_p"></p></div>
+      <div><form id="news" novalidate><input type="email" data-i18n-ph="email" data-i18n-aria="email" autocomplete="email"><button class="btn btn-primary" data-i18n="subscribe"></button></form><div class="field-err"></div></div>
+    </div>
+  </div></section>
+</main>
+<div id="site-footer"></div>
+<script src="js/data.js"></script><script src="js/app.js"></script>
+<script>
+SU.boot(() => {
+  const { $, t } = SU;
+  const hero = SU.PRODUCTS.find(p => p.name === "Stride Pro");
+  $("#hero-art").insertAdjacentHTML("beforeend", SU.shoe(hero));
+  const newp = SU.PRODUCTS.find(p => p.isNew && p.cat === "boots") || SU.PRODUCTS.find(p => p.isNew);
+  $("#newart").innerHTML = SU.shoe(newp);
+
+  const catCards = [
+    { href: "catalog.html?gender=men", n: t("cat_men"), d: t("cat_men_d"), p: SU.bySlug("oxford-no-1-18") || SU.PRODUCTS[17] },
+    { href: "catalog.html?gender=women", n: t("cat_women"), d: t("cat_women_d"), p: SU.PRODUCTS.find(p => p.gender === "women" && p.cat === "classic") },
+    ...Object.keys(SU.CATEGORIES).filter(c => ["sneakers", "sport", "casual", "classic"].includes(c)).map(c => ({ href: "catalog.html?cat=" + c, n: SU.catName(c), d: SU.CATEGORIES[c].desc[SU.lang], p: SU.PRODUCTS.find(p => p.cat === c) }))
+  ].slice(0, 6);
+  $("#cats").innerHTML = catCards.map(c => `<a class="cat" href="${c.href}">${SU.shoe(c.p)}<h3>${c.n}</h3><p>${c.d}</p><span class="go">${t("see")} ${SU.icon.arrow}</span></a>`).join("");
+
+  $("#best").innerHTML = SU.PRODUCTS.filter(p => p.best && SU.totalStock(p)).sort((a, b) => b.pop - a.pop).slice(0, 8).map(SU.card).join("");
+  $("#sale").innerHTML = SU.PRODUCTS.filter(p => p.old && SU.totalStock(p)).sort((a, b) => SU.discountPct(b) - SU.discountPct(a)).slice(0, 4).map(SU.card).join("");
+
+  const ben = [["shield", "b1"], ["truck", "b2"], ["lock", "b3"], ["chat", "b4"], ["swap", "b5"]];
+  $("#benefits").innerHTML = ben.map(([i, k]) => `<div class="benefit"><div class="ic">${SU.icon[i]}</div><h3>${t(k)}</h3><p>${t(k + "d")}</p></div>`).join("");
+
+  $("#reviews").innerHTML = SU.REVIEWS.map(r => {
+    const p = SU.byId(r.pid);
+    return `<div class="review"><span class="demo-note">${t("demo_rev")}</span><div class="stars" aria-label="${r.rating}/5">${SU.starsHTML(r.rating)}</div><p>${SU.esc(r.text[SU.lang])}</p>
+      <div style="display:flex;align-items:center;gap:12px"><div style="width:64px">${p ? SU.shoe(p) : ""}</div><div><b>${SU.esc(r.name)}</b><div class="muted" style="font-size:.85rem">${SU.date(r.date)}${p ? " · " + SU.esc(p.name) : ""}</div></div></div></div>`;
+  }).join("");
+
+  SU.mountNewsletter($("#news"));
+});
+</script>
+</body>
+</html>

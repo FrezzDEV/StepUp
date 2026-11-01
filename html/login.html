@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Вхід — STEPUP</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="site-header"></div>
+<main class="wrap page"><div class="auth">
+  <h1 data-i18n="login"></h1><p class="muted" style="margin-bottom:24px">Demo admin: admin@stepup.demo / admin12345</p>
+  <form class="form" id="f" novalidate>
+    <div class="fld"><label for="em" data-i18n="email"></label><input id="em" type="email" autocomplete="email"></div>
+    <div class="fld"><label for="pw" data-i18n="pass"></label><input id="pw" type="password" autocomplete="current-password"></div>
+    <div class="field-err" id="err" role="alert"></div>
+    <button class="btn btn-primary btn-block" data-i18n="login"></button>
+    <a href="#" id="forgot" class="muted" style="text-decoration:underline;text-align:center" data-i18n="forgot"></a>
+  </form>
+  <p style="margin-top:20px;text-align:center"><span class="muted" data-i18n="no_acc"></span> <a href="register.html" style="font-weight:700;text-decoration:underline" data-i18n="register"></a></p>
+</div></main>
+<div id="site-footer"></div>
+<script src="js/data.js"></script><script src="js/app.js"></script>
+<script>
+SU.boot(() => {
+  const { $, t } = SU;
+  $("#forgot").onclick = e => { e.preventDefault(); SU.modal(`<h3 style="margin-bottom:10px">${t("forgot")}</h3><p class="muted">${t("forgot_msg")}</p>`, "sm"); };
+  $("#f").onsubmit = async e => {
+    e.preventDefault();
+    const email = $("#em").value.trim().toLowerCase(), h = await SU.sha($("#pw").value);
+    const u = SU.users.all().find(x => x.email === email && x.hash === h);
+    if (!u) { $("#err").textContent = t("bad_cred"); return; }
+    SU.users.login(u.id);
+    const next = new URLSearchParams(location.search).get("next");
+    location.href = next && /^[a-z-]+\.html/.test(next) ? next : "account.html";
+  };
+});
+</script>
+</body>
+</html>

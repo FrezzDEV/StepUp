@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Кошик — STEPUP</title>
+<meta name="description" content="Ваш кошик у STEPUP.">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="site-header"></div>
+<main class="wrap page">
+  <h1 data-i18n="cart_t"></h1>
+  <div id="view"></div>
+  <section id="rec" style="margin-top:56px"></section>
+</main>
+<div id="site-footer"></div>
+<script src="js/data.js"></script><script src="js/app.js"></script>
+<script>
+SU.boot(() => {
+  const { $, $$, t } = SU;
+  let promo = SU.ls.get("su_promo", "");
+  let promoMsg = "";
+
+  function render() {
+    // drop lines whose product no longer exists / has no stock for that size
+    let items = SU.cart.get().filter(i => SU.byId(i.id));
+    items.forEach(i => { const q = SU.byId(i.id).sizes[i.size] || 0; if (i.qty > q) i.qty = Math.max(q, 0); });
+    items = items.filter(i => i.qty > 0);
+    SU.ls.set("su_cart", items); SU.updateBadges();
+
+    const view = $("#view");
+    if (!items.length) {
+      view.innerHTML = `<div class="empty"><svg width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="#171717" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7h12l1 14H5L6 7Z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg><h3>${t("cart_empty")}</h3><p>${t("cart_empty_p")}</p><a class="btn btn-primary" href="catalog.html">${t("back_shop")}</a></div>`;
+    } else {
+      const T = SU.totals(promo, null);
+      view.innerHTML = `<div class="cart-layout"><div>${T.lines.map(l => {
+        const p = l.p, avail = Object.entries(p.sizes).filter(([s, q]) => q > 0 || s === l.size).map(([s]) => s);
+        return `<div class="line" data-id="${p.id}" data-size="${l.size}">
+          <a class="pic" href="product.html?slug=${p.slug}">${SU.shoe(p)}</a>
+          <div class="meta"><span class="muted" style="font-size:.8rem;font-weight:700;text-transform:uppercase">${SU.esc(p.brand)}</span><a href="product.html?slug=${p.slug}"><b>${SU.esc(p.name)}</b></a>
+            <span class="muted">${SU.money(p.price)}${p.old ? ` <s>${SU.money(p.old)}</s>` : ""}</span>
+            <div class="ctrl">
+              <select class="sz" data-sz aria-label="${t("size")}">${avail.map(s => `<option value="${s}" ${s === l.size ? "selected" : ""}>${t("size")} ${s}</option>`).join("")}</select>
+              <div class="qty"><button data-m="-1" aria-label="−">−</button><span aria-live="polite">${l.qty}</span><button data-m="1" aria-label="+" ${l.qty >= (p.sizes[l.size] || 0) ? "disabled" : ""}>+</button></div>
+              <button class="rm" data-rm>${t("remove")}</button></div>
+            ${l.qty >= (p.sizes[l.size] || 0) ? `<span class="muted" style="font-size:.8rem">${t("stock_warn")} (${p.sizes[l.size]} ${t("pcs")})</span>` : ""}</div>
+          <div class="tot">${SU.money(p.price * l.qty)}</div></div>`;
+      }).join("")}</div>
+      <aside class="summary"><h3>${t("summary")}</h3>
+        <div class="promo-row"><input id="promo" placeholder="${t("promo")}" value="${SU.esc(promo)}" aria-label="${t("promo")}"><button class="btn btn-ghost" id="apply">${t("apply_p")}</button></div>
+        <div class="${promoMsg === "ok" ? "ok-txt" : "field-err"}" style="margin:-8px 0 8px">${promoMsg === "ok" ? t("promo_ok") : promoMsg === "bad" ? t("promo_bad") : `<span class="muted">${t("promo_hint")}</span>`}</div>
+        <div class="row"><span>${t("subtotal")}</span><span>${SU.money(T.subtotal)}</span></div>
+        ${T.discount ? `<div class="row" style="color:var(--ok)"><span>${t("discount")} (${T.promo})</span><span>−${SU.money(T.discount)}</span></div>` : ""}
+        <div class="row"><span>${t("delivery_cost")}</span><span class="muted">${t("checkout")} →</span></div>
+        <div class="row total"><span>${t("total")}</span><span>${SU.money(T.total)}</span></div>
+        <a class="btn btn-primary btn-block" href="checkout.html" style="margin-top:18px">${t("checkout")}</a>
+        <p class="muted" style="font-size:.8rem;margin-top:12px">${t("pay_note")}</p></aside></div>`;
+    }
+    const inCart = new Set(items.map(i => i.id));
+    const rec = SU.PRODUCTS.filter(p => !inCart.has(p.id) && SU.totalStock(p)).sort((a, b) => b.pop - a.pop).slice(0, 4);
+    $("#rec").innerHTML = `<div class="sec-head"><h2>${t("recommended")}</h2></div><div class="grid">${rec.map(SU.card).join("")}</div>`;
+  }
+
+  document.addEventListener("click", async e => {
+    const line = e.target.closest(".line");
+    if (line) {
+      const id = +line.dataset.id, size = line.dataset.size;
+      const q = e.target.closest("[data-m]");
+      if (q) { const cur = SU.cart.get().find(i => i.id === id && i.size === size); SU.cart.setQty(id, size, cur.qty + +q.dataset.m); render(); }
+      if (e.target.closest("[data-rm]")) { if (await SU.confirm(t("rm_confirm"))) { SU.cart.remove(id, size); render(); } }
+    }
+    if (e.target.id === "apply") {
+      const v = $("#promo").value.trim().toUpperCase();
+      if (!v) { promo = ""; promoMsg = ""; } else if (SU.PROMOS[v]) { promo = v; promoMsg = "ok"; } else { promo = ""; promoMsg = "bad"; }
+      SU.ls.set("su_promo", promo); render();
+    }
+  });
+  document.addEventListener("change", e => {
+    if (e.target.matches("[data-sz]")) { const l = e.target.closest(".line"); SU.cart.changeSize(+l.dataset.id, l.dataset.size, e.target.value); render(); }
+  });
+  SU.onFavChange = () => {};
+  render();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Оформлення замовлення — STEPUP</title>
+<meta name="description" content="Оформлення замовлення у STEPUP.">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="site-header"></div>
+<main class="wrap page">
+  <h1 data-i18n="checkout"></h1>
+  <div id="empty" hidden><div class="empty"><h3 data-i18n="cart_empty"></h3><p></p><a class="btn btn-primary" href="catalog.html" data-i18n="back_shop"></a></div></div>
+  <div class="cart-layout" id="main">
+    <div>
+      <div class="steps" id="steps"></div>
+      <form id="form" novalidate>
+        <div class="panel on" data-p="1"><div class="form two">
+          <div class="fld"><label for="fn" data-i18n="fn"></label><input id="fn" autocomplete="given-name"><div class="field-err"></div></div>
+          <div class="fld"><label for="ln" data-i18n="ln"></label><input id="ln" autocomplete="family-name"><div class="field-err"></div></div>
+          <div class="fld"><label for="ph" data-i18n="phone"></label><input id="ph" type="tel" placeholder="+380 __ ___ __ __" autocomplete="tel"><div class="field-err"></div></div>
+          <div class="fld"><label for="em" data-i18n="email"></label><input id="em" type="email" autocomplete="email"><div class="field-err"></div></div>
+        </div></div>
+        <div class="panel" data-p="2">
+          <div class="form" id="dm"></div>
+          <div class="form two" style="margin-top:16px">
+            <div class="fld"><label for="city" data-i18n="city"></label><input id="city" autocomplete="address-level2"><div class="field-err"></div></div>
+            <div class="fld"><label for="addr" data-i18n="addr"></label><input id="addr" autocomplete="street-address"><div class="field-err"></div></div>
+          </div>
+          <div class="notice" data-i18n="deliv_note"></div>
+        </div>
+        <div class="panel" data-p="3">
+          <div class="form">
+            <label class="opt"><input type="radio" name="pay" value="online" checked><div><b data-i18n="pay_online"></b></div></label>
+            <label class="opt"><input type="radio" name="pay" value="cod"><div><b data-i18n="pay_cod"></b></div></label>
+          </div>
+          <div class="notice" data-i18n="pay_note"></div>
+        </div>
+        <div class="panel" data-p="4">
+          <div id="review"></div>
+          <label class="check" style="margin-top:16px;align-items:flex-start"><input type="checkbox" id="terms"> <span data-i18n="terms"></span></label>
+          <div class="field-err" id="terms-err"></div>
+          <div class="field-err" id="order-err" role="alert"></div>
+        </div>
+        <div class="nav-row"><button type="button" class="btn btn-ghost" id="prev" data-i18n="back"></button><button type="button" class="btn btn-primary" id="next" data-i18n="next"></button></div>
+      </form>
+    </div>
+    <aside class="summary" id="sum"></aside>
+  </div>
+</main>
+<div id="site-footer"></div>
+<script src="js/data.js"></script><script src="js/app.js"></script>
+<script>
+SU.boot(() => {
+  const { $, $$, t } = SU;
+  if (!SU.cart.get().length) { $("#main").hidden = true; $("#empty").hidden = false; return; }
+  const promo = SU.ls.get("su_promo", "");
+  const me = SU.users.me();
+  if (me) { const [f, ...l] = (me.name || "").split(" "); $("#fn").value = f || ""; $("#ln").value = l.join(" "); $("#em").value = me.email || ""; $("#ph").value = me.phone || ""; }
+
+  let step = 1, method = "courier";
+  // one key per checkout attempt: prevents duplicate orders on double-click
+  const idemKey = "ord-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  let placing = false;
+
+  const names = { courier: "d_courier", post: "d_post", locker: "d_locker", pickup: "d_pickup" };
+  $("#dm").innerHTML = Object.keys(SU.DELIVERY).map(k => `<label class="opt"><input type="radio" name="dm" value="${k}" ${k === method ? "checked" : ""}><div><b>${t(names[k])}</b></div><span class="p" data-dp="${k}"></span></label>`).join("");
+
+  function totals() { return SU.totals(promo, method); }
+  function renderSum() {
+    const T = totals();
+    $("#sum").innerHTML = `<h3>${t("summary")}</h3>${T.lines.map(l => `<div class="row" style="gap:12px"><span>${SU.esc(l.p.name)} · ${l.size} × ${l.qty}</span><span>${SU.money(l.p.price * l.qty)}</span></div>`).join("")}
+      <div class="row" style="border-top:1px solid #d9d9d6;margin-top:8px"><span>${t("subtotal")}</span><span>${SU.money(T.subtotal)}</span></div>
+      ${T.discount ? `<div class="row" style="color:var(--ok)"><span>${t("discount")} (${T.promo})</span><span>−${SU.money(T.discount)}</span></div>` : ""}
+      <div class="row"><span>${t("delivery_cost")}</span><span>${T.delivery ? SU.money(T.delivery) : t("free")}</span></div>
+      <div class="row total"><span>${t("total")}</span><span>${SU.money(T.total)}</span></div>`;
+    Object.keys(SU.DELIVERY).forEach(k => { const x = SU.totals(promo, k).delivery; const el = $(`[data-dp="${k}"]`); if (el) el.textContent = x ? SU.money(x) : t("free"); });
+  }
+  function renderSteps() {
+    const labels = ["st_contact", "st_delivery", "st_payment", "st_confirm"];
+    $("#steps").innerHTML = labels.map((l, i) => `<div class="${i + 1 === step ? "on" : i + 1 < step ? "done" : ""}"><b>${i + 1 < step ? "✓" : i + 1}</b>${t(l)}</div>`).join("");
+    $$(".panel").forEach(p => p.classList.toggle("on", +p.dataset.p === step));
+    $("#prev").style.visibility = step === 1 ? "hidden" : "visible";
+    $("#next").textContent = step === 4 ? t("place") : t("next");
+    if (step === 4) renderReview();
+  }
+  function renderReview() {
+    const T = totals();
+    $("#review").innerHTML = `<div class="box" style="margin-top:0"><h3 style="margin-bottom:10px">${t("items")}</h3>${T.lines.map(l => `<div class="row"><span>${SU.esc(l.p.brand)} ${SU.esc(l.p.name)} · ${t("size")} ${l.size} × ${l.qty}</span><span>${SU.money(l.p.price * l.qty)}</span></div>`).join("")}
+      <div class="row" style="border-top:1px solid var(--line);margin-top:8px"><span>${t("delivery_cost")}: ${t(names[method])}</span><span>${T.delivery ? SU.money(T.delivery) : t("free")}</span></div>
+      ${T.discount ? `<div class="row"><span>${t("discount")}</span><span>−${SU.money(T.discount)}</span></div>` : ""}
+      <div class="row total"><span>${t("total")}</span><span>${SU.money(T.total)}</span></div>
+      <p class="muted" style="margin-top:8px">${SU.esc($("#fn").value)} ${SU.esc($("#ln").value)} · ${SU.esc($("#ph").value)} · ${SU.esc($("#city").value)}, ${SU.esc($("#addr").value)}</p></div>`;
+  }
+  const bad = (el, msg) => { const f = el.closest(".fld"); f.classList.toggle("bad", !!msg); $(".field-err", f).textContent = msg || ""; return !msg; };
+  function validate(s) {
+    if (s === 1) {
+      const a = bad($("#fn"), $("#fn").value.trim() ? "" : t("req")), b = bad($("#ln"), $("#ln").value.trim() ? "" : t("req"));
+      const c = bad($("#ph"), /^\+?[0-9\s()-]{9,18}$/.test($("#ph").value.trim()) ? "" : t("phone_bad"));
+      const d = bad($("#em"), /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test($("#em").value.trim()) ? "" : t("email_bad"));
+      return a && b && c && d;
+    }
+    if (s === 2) return bad($("#city"), $("#city").value.trim() ? "" : t("req")) & bad($("#addr"), $("#addr").value.trim() ? "" : t("req")) ? true : false;
+    if (s === 4) { const ok = $("#terms").checked; $("#terms-err").textContent = ok ? "" : t("terms_req"); return ok; }
+    return true;
+  }
+
+  $("#form").addEventListener("change", e => {
+    if (e.target.name === "dm") { method = e.target.value; if (method === "pickup" && !$("#addr").value) { $("#addr").value = "STEPUP, Kyiv"; $("#city").value = $("#city").value || "Київ"; } renderSum(); }
+  });
+  $("#prev").onclick = () => { if (step > 1) { step--; renderSteps(); } };
+  $("#next").onclick = async () => {
+    if (!validate(step)) return;
+    if (step < 4) { step++; renderSteps(); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+    if (placing) return;
+    placing = true; $("#next").disabled = true; $("#next").textContent = t("placing"); $("#order-err").textContent = "";
+    try { await placeOrder(); } catch (err) {
+      $("#order-err").textContent = err.message === "stock" ? t("stock_warn") : t("order_fail");
+      placing = false; $("#next").disabled = false; $("#next").textContent = t("place");
+    }
+  };
+
+  /** DEMO order creation. In the Next.js project this runs on the server inside a DB transaction. */
+  async function placeOrder() {
+    await new Promise(r => setTimeout(r, 500));
+    const orders = SU.ls.get("su_orders", []);
+    if (orders.find(o => o.key === idemKey)) { location.href = "order-success.html?n=" + orders.find(o => o.key === idemKey).number; return; }
+    // re-validate against the live catalog (never trust the cart's own numbers)
+    const T = totals();
+    for (const l of T.lines) if ((l.p.sizes[l.size] || 0) < l.qty) throw new Error("stock");
+    T.lines.forEach(l => { l.p.sizes[l.size] -= l.qty; });
+    SU.saveProducts();
+    const d = new Date(), number = `SU-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}-${Math.random().toString(16).slice(2, 8).toUpperCase()}`;
+    const order = {
+      key: idemKey, number, userId: me ? me.id : null, created: Date.now(), status: "new",
+      contact: { fn: $("#fn").value.trim(), ln: $("#ln").value.trim(), phone: $("#ph").value.trim(), email: $("#em").value.trim() },
+      delivery: { method, city: $("#city").value.trim(), addr: $("#addr").value.trim() },
+      payment: $("input[name=pay]:checked").value, paymentStatus: "pending",
+      items: T.lines.map(l => ({ id: l.p.id, name: l.p.name, brand: l.p.brand, size: l.size, qty: l.qty, price: l.p.price })), // snapshots
+      subtotal: T.subtotal, discount: T.discount, promo: T.promo, deliveryPrice: T.delivery, total: T.total, comment: "", demo: false
+    };
+    orders.unshift(order); SU.ls.set("su_orders", orders);
+    SU.cart.clear(); localStorage.removeItem("su_promo");
+    location.href = "order-success.html?n=" + number;
+  }
+
+  renderSteps(); renderSum();
+});
+</script>
+</body>
+</html>

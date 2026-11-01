@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Замовлення оформлено — STEPUP</title>
+<meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="site-header"></div>
+<main class="wrap page"><div id="root"></div></main>
+<div id="site-footer"></div>
+<script src="js/data.js"></script><script src="js/app.js"></script>
+<script>
+SU.boot(() => {
+  const { $, t } = SU;
+  const n = new URLSearchParams(location.search).get("n");
+  const o = SU.ls.get("su_orders", []).find(x => x.number === n);
+  // success is shown ONLY if the order actually exists in the store
+  if (!o) { $("#root").innerHTML = `<div class="empty"><h3>${t("no_order")}</h3><p></p><a class="btn btn-primary" href="catalog.html">${t("back_shop")}</a></div>`; return; }
+  const dn = { courier: "d_courier", post: "d_post", locker: "d_locker", pickup: "d_pickup" };
+  $("#root").innerHTML = `<div class="success"><div class="tick">${SU.icon.check}</div><h1 style="font-size:clamp(2rem,4vw,3rem)">${t("ok_t")}</h1><p class="muted" style="margin-top:10px">${t("ok_p")}</p>
+    <div class="box"><div class="row"><span class="muted">${t("order_no")}</span><b>${SU.esc(o.number)}</b></div><div class="row"><span class="muted">${t("date")}</span><span>${SU.date(o.created)}</span></div>
+    <div class="row"><span class="muted">${t("status")}</span><span class="status ${o.status}">${t("st_" + o.status)}</span></div>
+    <div class="row"><span class="muted">${t("delivery_cost")}</span><span>${t(dn[o.delivery.method])} · ${SU.esc(o.delivery.city)}</span></div>
+    <hr style="border:0;border-top:1px solid var(--line);margin:12px 0">
+    ${o.items.map(i => `<div class="row"><span>${SU.esc(i.brand)} ${SU.esc(i.name)} · ${t("size")} ${i.size} × ${i.qty}</span><span>${SU.money(i.price * i.qty)}</span></div>`).join("")}
+    ${o.discount ? `<div class="row"><span>${t("discount")}</span><span>−${SU.money(o.discount)}</span></div>` : ""}
+    <div class="row"><span>${t("delivery_cost")}</span><span>${o.deliveryPrice ? SU.money(o.deliveryPrice) : t("free")}</span></div>
+    <div class="row total"><span>${t("total")}</span><span>${SU.money(o.total)}</span></div></div>
+    <div class="notice">${t("ok_demo")}</div>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><a class="btn btn-primary" href="account-orders.html">${t("my_orders")}</a><a class="btn btn-ghost" href="catalog.html">${t("back_shop")}</a></div></div>`;
+});
+</script>
+</body>
+</html>

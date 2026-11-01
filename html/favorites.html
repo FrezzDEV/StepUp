@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Обране — STEPUP</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="site-header"></div>
+<main class="wrap page"><h1 data-i18n="fav_t"></h1><div id="view"></div></main>
+<div id="site-footer"></div>
+<script src="js/data.js"></script><script src="js/app.js"></script>
+<script>
+SU.boot(() => {
+  const { $, t } = SU;
+  function render() {
+    const items = SU.favs.get().map(SU.byId).filter(Boolean);
+    if (!items.length) { $("#view").innerHTML = `<div class="empty"><svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#171717" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.9 0-3 .5-4.5 2-1.5-1.5-2.6-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7Z"/></svg><h3>${t("fav_empty")}</h3><p>${t("fav_empty_p")}</p><a class="btn btn-primary" href="catalog.html">${t("back_shop")}</a></div>`; return; }
+    $("#view").innerHTML = `<div class="grid">${items.map(p => `<div>${SU.card(p)}<button class="btn btn-ghost btn-block" style="margin-top:10px;min-height:42px" data-move="${p.id}">${t("to_cart")}</button></div>`).join("")}</div>`;
+  }
+  // removing from favorites on this page removes the card
+  SU.onFavChange = () => setTimeout(render, 50);
+  document.addEventListener("click", e => {
+    const m = e.target.closest("[data-move]"); if (!m) return;
+    const p = SU.byId(+m.dataset.move), sizes = SU.availSizes(p);
+    if (!sizes.length) { SU.toast(t("out_stock"), "err"); return; }
+    if (sizes.length === 1) { SU.cart.add(p.id, sizes[0]); SU.toast(t("added"), "ok", { href: "cart.html", text: t("go_cart") }); SU.bumpCart(); }
+    else SU.quickView(p.id); // ask the customer to choose a size
+  });
+  render();
+});
+</script>
+</body>
+</html>

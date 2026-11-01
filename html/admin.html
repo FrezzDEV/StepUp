@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin — STEPUP</title>
+<meta name="robots" content="noindex,nofollow">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body style="background:var(--soft)">
+<div id="root"></div>
+<script src="js/data.js"></script><script src="js/app.js"></script>
+<script>
+SU.boot(() => {
+  const { $, $$, t } = SU;
+  const root = $("#root");
+  const me = SU.users.me();
+  // DEMO GUARD ONLY (client side). In the Next.js project the role is verified on the server for every request.
+  if (!me || me.role !== "admin") {
+    root.innerHTML = `<div class="guard"><h2 style="font-size:1.8rem;margin-bottom:8px">Admin</h2><p class="muted" style="margin-bottom:18px">${me ? "403 — " : ""}${t("need_login")}</p><a class="btn btn-primary btn-block" href="login.html?next=admin.html">${t("login")}</a><p class="muted" style="font-size:.8rem;margin-top:14px">Demo: admin@stepup.demo / admin12345. This guard is client-side and for demonstration only.</p></div>`;
+    return;
+  }
+
+  // sample orders so the dashboard has data (clearly flagged demo)
+  if (!SU.ls.get("su_seeded", false)) {
+    const names = [["Олена", "Коваль"], ["Максим", "Дорошенко"], ["Ірина", "Савчук"], ["Андрій", "Мельник"], ["Софія", "Бондар"], ["Тарас", "Литвин"], ["Наталія", "Гончар"]];
+    const sts = ["delivered", "delivered", "shipped", "preparing", "confirmed", "new", "cancelled"];
+    const seed = names.map((n, i) => {
+      const ps = [SU.PRODUCTS[(i * 3) % 28], SU.PRODUCTS[(i * 5 + 1) % 28]];
+      const items = ps.map((p, j) => ({ id: p.id, name: p.name, brand: p.brand, size: SU.availSizes(p)[0] || "42", qty: j ? 1 : 1 + (i % 2), price: p.price }));
+      const subtotal = items.reduce((s, x) => s + x.price * x.qty, 0), dp = subtotal >= 3000 ? 0 : 80;
+      return { key: "demo-" + i, number: `SU-DEMO-${1001 + i}`, userId: null, created: Date.now() - (i * 1.3 + 0.5) * 864e5, status: sts[i],
+        contact: { fn: n[0], ln: n[1], phone: "+38050000" + (1000 + i), email: `demo${i}@example.com` }, delivery: { method: ["courier", "post", "locker", "pickup"][i % 4], city: "Київ", addr: "вул. Демонстраційна, " + (i + 1) },
+        payment: i % 2 ? "cod" : "online", paymentStatus: sts[i] === "cancelled" ? "refunded" : "pending", items, subtotal, discount: 0, promo: null, deliveryPrice: dp, total: subtotal + dp, comment: "", demo: true };
+    });
+    SU.ls.set("su_orders", [...SU.ls.get("su_orders", []), ...seed]); SU.ls.set("su_seeded", true);
+  }
+
+  const orders = () => SU.ls.get("su_orders", []);
+  const saveOrders = o => SU.ls.set("su_orders", o);
+  const STAT = ["new", "confirmed", "preparing", "shipped", "delivered", "cancelled"];
+  let tab = "overview", oq = "", os = "", pq = "";
+
+  const tabs = [["overview", "Overview"], ["products", "Products"], ["orders", "Orders"], ["users", "Users"], ["content", "Content"]];
+  function shell() {
+    root.innerHTML = `<div class="admin"><aside><a class="logo" href="index.html" style="color:#fff">STEPUP</a>${tabs.map(([k, l]) => `<button data-tab="${k}" class="${k === tab ? "on" : ""}">${l}</button>`).join("")}<button onclick="location.href='index.html'">← Store</button></aside><main id="main"></main></div>`;
+    $$("[data-tab]").forEach(b => b.onclick = () => { tab = b.dataset.tab; shell(); view(); });
+  }
+  const pe = id => SU.byId(id);
+  const mini = p => `<div class="mini">${SU.shoe(p)}</div>`;
+
+  function overview() {
+    const os_ = orders().filter(o => o.status !== "cancelled");
+    const rev = os_.reduce((s, o) => s + o.total, 0), n = os_.length;
+    const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (6 - i)); return d; });
+    const sums = days.map(d => os_.filter(o => { const c = new Date(o.created); c.setHours(0, 0, 0, 0); return +c === +d; }).reduce((s, o) => s + o.total, 0));
+    const mx = Math.max(...sums, 1);
+    const sold = {}; os_.forEach(o => o.items.forEach(i => { sold[i.id] = (sold[i.id] || 0) + i.qty; }));
+    const top = Object.entries(sold).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    return `<h1 style="font-size:2rem">Overview</h1><p class="muted">Demo data · ${SU.PRODUCTS.length} products</p>
+    <div class="kpis"><div class="kpi"><small>Revenue</small><b>${SU.money(rev)}</b></div><div class="kpi"><small>Orders</small><b>${n}</b></div><div class="kpi"><small>Avg. order</small><b>${SU.money(n ? Math.round(rev / n) : 0)}</b></div><div class="kpi"><small>New orders</small><b>${orders().filter(o => o.status === "new").length}</b></div>
+    <div class="kpi"><small>Products</small><b>${SU.PRODUCTS.length}</b></div><div class="kpi"><small>Users</small><b>${SU.users.all().length}</b></div><div class="kpi"><small>Subscribers</small><b>${SU.ls.get("su_news", []).length}</b></div><div class="kpi"><small>Low stock (≤3)</small><b>${SU.PRODUCTS.filter(p => SU.totalStock(p) <= 3).length}</b></div></div>
+    <div class="white"><h3>Sales · last 7 days</h3><div class="bars">${sums.map((v, i) => `<div><span>${v ? Math.round(v / 1000) + "k" : ""}</span><i style="height:${Math.max(2, v / mx * 150)}px"></i>${days[i].toLocaleDateString(SU.lang, { weekday: "short" })}</div>`).join("")}</div></div>
+    <div class="white"><h3 style="margin-bottom:10px">Best sellers</h3><table><tr><th></th><th>Product</th><th>Units</th></tr>${top.map(([id, q]) => { const p = pe(+id); return p ? `<tr><td>${mini(p)}</td><td>${SU.esc(p.brand)} ${SU.esc(p.name)}</td><td>${q}</td></tr>` : ""; }).join("") || `<tr><td colspan=3 class="muted">—</td></tr>`}</table></div>`;
+  }
+
+  function products() {
+    const list = SU.PRODUCTS.filter(p => !pq || (p.name + p.brand).toLowerCase().includes(pq.toLowerCase()));
+    return `<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px"><h1 style="font-size:2rem">Products</h1><button class="btn btn-primary" id="addp">+ Add product</button></div>
+    <div class="bar" style="margin-top:14px"><input id="pq" placeholder="Search…" value="${SU.esc(pq)}"></div>
+    <div class="white" style="overflow:auto"><table><tr><th></th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Labels</th><th></th></tr>
+    ${list.map(p => `<tr><td>${mini(p)}</td><td><b>${SU.esc(p.name)}</b><br><span class="muted">${SU.esc(p.brand)}</span></td><td>${SU.catName(p.cat)}</td><td>${SU.money(p.price)}${p.old ? `<br><s class="muted">${SU.money(p.old)}</s>` : ""}</td><td>${SU.totalStock(p)}</td>
+      <td>${p.isNew ? "NEW " : ""}${p.best ? "BEST " : ""}${p.old ? "SALE" : ""}</td><td style="white-space:nowrap"><button class="btn btn-ghost" data-edit="${p.id}">Edit</button> <button class="btn btn-danger btn-ghost" data-del="${p.id}">Delete</button></td></tr>`).join("")}</table></div>`;
+  }
+
+  function productForm(p) {
+    const isNew = !p;
+    p = p || { id: 0, name: "", brand: "", cat: "sneakers", gender: "unisex", price: 1000, old: null, colors: ["black"], isNew: true, best: false, sizes: { 40: 5, 41: 5, 42: 5, 43: 5 }, rating: 0, reviews: 0, pop: 0, created: Date.now(), demo: false };
+    const m = SU.modal(`<div style="padding:32px"><h2 style="font-size:1.6rem;margin-bottom:16px">${isNew ? "Add product" : "Edit product"}</h2>
+      <form class="form two" id="pform" novalidate>
+        <div class="fld"><label>Name</label><input name="name" value="${SU.esc(p.name)}"></div><div class="fld"><label>Brand</label><input name="brand" value="${SU.esc(p.brand)}"></div>
+        <div class="fld"><label>Category</label><select name="cat">${Object.keys(SU.CATEGORIES).map(c => `<option value="${c}" ${c === p.cat ? "selected" : ""}>${SU.catName(c)}</option>`).join("")}</select></div>
+        <div class="fld"><label>Gender</label><select name="gender">${["men", "women", "unisex"].map(g => `<option ${g === p.gender ? "selected" : ""}>${g}</option>`).join("")}</select></div>
+        <div class="fld"><label>Price (₴)</label><input name="price" type="number" min="1" value="${p.price}"></div><div class="fld"><label>Old price (₴, empty = no discount)</label><input name="old" type="number" min="0" value="${p.old || ""}"></div>
+        <div class="fld"><label>Main color</label><select name="c1">${Object.keys(SU.COLORS).map(c => `<option value="${c}" ${c === p.colors[0] ? "selected" : ""}>${SU.colorName(c)}</option>`).join("")}</select></div>
+        <div class="fld"><label>Accent color</label><select name="c2">${Object.keys(SU.COLORS).map(c => `<option value="${c}" ${c === (p.colors[1] || p.colors[0]) ? "selected" : ""}>${SU.colorName(c)}</option>`).join("")}</select></div>
+        <div class="fld" style="grid-column:1/-1"><label>Sizes &amp; stock (format <code>size:qty</code>, comma separated)</label><input name="sizes" value="${Object.entries(p.sizes).map(([s, q]) => s + ":" + q).join(", ")}"></div>
+        <label class="check"><input type="checkbox" name="isNew" ${p.isNew ? "checked" : ""}> NEW</label><label class="check"><input type="checkbox" name="best" ${p.best ? "checked" : ""}> BESTSELLER</label>
+        <p class="muted" style="grid-column:1/-1;font-size:.82rem">Photo upload is available in the full Next.js build (cloud storage). Here products use generated illustrations.</p>
+        <div class="field-err" id="perr" style="grid-column:1/-1"></div>
+        <div style="grid-column:1/-1;display:flex;gap:10px"><button class="btn btn-primary">Save</button><button type="button" class="btn btn-ghost" id="pc">Cancel</button></div></form></div>`);
+    $("#pc", m.el).onclick = m.close;
+    $("#pform", m.el).onsubmit = e => {
+      e.preventDefault();
+      const f = new FormData(e.target), g = k => (f.get(k) || "").toString().trim();
+      const price = +g("price"), old = +g("old") || null, sizes = {};
+      g("sizes").split(",").forEach(x => { const [s, q] = x.split(":").map(v => v.trim()); if (s && !isNaN(+s) && !isNaN(+q) && +q >= 0) sizes[s] = Math.floor(+q); });
+      let err = "";
+      if (!g("name") || !g("brand")) err = "Name and brand are required.";
+      else if (!(price > 0)) err = "Price must be greater than 0.";
+      else if (old && old <= price) err = "Old price must be higher than the current price.";
+      else if (!Object.keys(sizes).length) err = "Add at least one size, e.g. 42:5.";
+      if (err) { $("#perr", m.el).textContent = err; return; }
+      const data = { name: g("name"), brand: g("brand"), cat: g("cat"), gender: g("gender"), price, old, colors: [g("c1"), g("c2")], isNew: !!f.get("isNew"), best: !!f.get("best"), sizes };
+      if (isNew) {
+        const id = Math.max(0, ...SU.PRODUCTS.map(x => x.id)) + 1;
+        SU.PRODUCTS.push({ ...p, ...data, id, main: data.colors[0], slug: data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") + "-" + id, created: Date.now(), demo: false });
+      } else Object.assign(SU.byId(p.id), data, { main: data.colors[0] });
+      SU.saveProducts(); m.close(); SU.toast(t("saved_ok")); view();
+    };
+  }
+
+  function orderList() {
+    const list = orders().filter(o => (!oq || o.number.toLowerCase().includes(oq.toLowerCase())) && (!os || o.status === os));
+    return `<h1 style="font-size:2rem">Orders</h1><div class="bar" style="margin-top:14px"><input id="oq" placeholder="Order number…" value="${SU.esc(oq)}"><select id="os"><option value="">All statuses</option>${STAT.map(s => `<option value="${s}" ${s === os ? "selected" : ""}>${t("st_" + s)}</option>`).join("")}</select></div>
+    <div class="white" style="overflow:auto"><table><tr><th>Number</th><th>Date</th><th>Customer</th><th>Total</th><th>Status</th><th></th></tr>
+    ${list.map(o => `<tr><td><b>${SU.esc(o.number)}</b>${o.demo ? ' <span class="pill">DEMO</span>' : ""}</td><td>${SU.date(o.created)}</td><td>${SU.esc(o.contact.fn)} ${SU.esc(o.contact.ln)}</td><td>${SU.money(o.total)}</td><td><span class="status ${o.status}">${t("st_" + o.status)}</span></td><td><button class="btn btn-ghost" data-o="${o.number}">Open</button></td></tr>`).join("") || `<tr><td colspan=6 class="muted">No orders</td></tr>`}</table></div>`;
+  }
+  function orderDetail(num) {
+    const o = orders().find(x => x.number === num); if (!o) return;
+    const m = SU.modal(`<div style="padding:32px"><h2 style="font-size:1.5rem">${SU.esc(o.number)}</h2><p class="muted">${SU.date(o.created)} · ${SU.esc(o.contact.fn)} ${SU.esc(o.contact.ln)} · ${SU.esc(o.contact.phone)} · ${SU.esc(o.contact.email)}</p>
+      <p style="margin:8px 0">${SU.esc(o.delivery.method)} — ${SU.esc(o.delivery.city)}, ${SU.esc(o.delivery.addr)} · ${o.payment} (${o.paymentStatus})</p>
+      <table style="width:100%;margin:10px 0">${o.items.map(i => `<tr><td>${SU.esc(i.brand)} ${SU.esc(i.name)} · ${i.size} × ${i.qty}</td><td style="text-align:right">${SU.money(i.price * i.qty)}</td></tr>`).join("")}<tr><td><b>Total</b></td><td style="text-align:right"><b>${SU.money(o.total)}</b></td></tr></table>
+      <div class="fld"><label>Status</label><select id="ost" ${o.status === "cancelled" ? "disabled" : ""}>${STAT.map(s => `<option value="${s}" ${s === o.status ? "selected" : ""}>${t("st_" + s)}</option>`).join("")}</select></div>
+      <div class="fld" style="margin-top:10px"><label>Admin comment</label><textarea id="ocm">${SU.esc(o.comment || "")}</textarea></div>
+      <div style="display:flex;gap:10px;margin-top:14px"><button class="btn btn-primary" id="osave">Save</button>${o.status !== "cancelled" ? `<button class="btn btn-danger btn-ghost" id="ocancel" style="min-height:48px">Cancel &amp; restock</button>` : ""}</div></div>`);
+    const upd = fn => { const all = orders(); const x = all.find(y => y.number === num); fn(x); saveOrders(all); };
+    $("#osave", m.el).onclick = () => {
+      const ns = $("#ost", m.el).value;
+      if (ns === "cancelled" && o.status !== "cancelled") return restock(num, m, $("#ocm", m.el).value);
+      upd(x => { x.status = ns; x.comment = $("#ocm", m.el).value; if (ns === "delivered" && x.payment === "cod") x.paymentStatus = "paid"; });
+      m.close(); SU.toast(t("saved_ok")); view();
+    };
+    const c = $("#ocancel", m.el); if (c) c.onclick = () => restock(num, m, $("#ocm", m.el).value);
+  }
+  function restock(num, m, comment) {
+    const all = orders(), o = all.find(x => x.number === num);
+    if (!o || o.status === "cancelled") return; // restock exactly once
+    o.items.forEach(i => { const p = SU.byId(i.id); if (p) p.sizes[i.size] = (p.sizes[i.size] || 0) + i.qty; });
+    o.status = "cancelled"; o.comment = comment; if (o.paymentStatus === "paid") o.paymentStatus = "refunded";
+    SU.saveProducts(); saveOrders(all); m.close(); SU.toast("Order cancelled, stock returned"); view();
+  }
+
+  function users() {
+    const os_ = orders();
+    return `<h1 style="font-size:2rem">Users</h1><div class="white" style="overflow:auto;margin-top:14px"><table><tr><th>Name</th><th>Email</th><th>Role</th><th>Orders</th><th>Spent</th></tr>
+    ${SU.users.all().map(u => { const mine = os_.filter(o => o.userId === u.id && o.status !== "cancelled"); return `<tr><td>${SU.esc(u.name)}</td><td>${SU.esc(u.email)}</td><td>${u.role}</td><td>${mine.length}</td><td>${SU.money(mine.reduce((s, o) => s + o.total, 0))}</td></tr>`; }).join("")}</table>
+    <p class="muted" style="font-size:.85rem;margin-top:12px">Password data is never shown to administrators.</p></div>`;
+  }
+
+  function content() {
+    const pr = SU.ls.get("su_promos", {});
+    const all = { ...SU.PROMOS };
+    return `<h1 style="font-size:2rem">Content</h1>
+    <div class="white" style="margin-top:14px"><h3>Promo codes</h3><table style="margin:10px 0"><tr><th>Code</th><th>Type</th><th>Value</th><th></th></tr>${Object.entries(all).map(([c, v]) => `<tr><td><b>${c}</b></td><td>${v.type}</td><td>${v.value}${v.type === "percent" ? "%" : " ₴"}</td><td>${pr[c] ? `<button class="btn btn-danger btn-ghost" data-dp="${c}">Delete</button>` : '<span class="muted">built-in</span>'}</td></tr>`).join("")}</table>
+      <form class="bar" id="pf"><input name="code" placeholder="CODE" required style="text-transform:uppercase"><select name="type"><option value="percent">percent</option><option value="fixed">fixed (₴)</option></select><input name="value" type="number" min="1" placeholder="Value" required><button class="btn btn-primary">Add</button></form><div class="field-err" id="pe"></div></div>
+    <div class="white"><h3>Homepage &amp; labels</h3><p class="muted" style="margin-top:6px">Manage NEW / BESTSELLER / SALE labels and prices in <b>Products</b>. Bestsellers, new arrivals and sale blocks on the homepage are generated from those flags. Banner and review editing are part of the full build.</p></div>`;
+  }
+
+  function view() {
+    $("#main").innerHTML = { overview, products, orders: orderList, users, content }[tab]();
+    if (tab === "products") {
+      $("#addp").onclick = () => productForm(null);
+      $("#pq").oninput = e => { pq = e.target.value; const pos = e.target.selectionStart; view(); const n = $("#pq"); n.focus(); n.setSelectionRange(pos, pos); };
+      $$("[data-edit]").forEach(b => b.onclick = () => productForm(SU.byId(+b.dataset.edit)));
+      $$("[data-del]").forEach(b => b.onclick = async () => { const p = SU.byId(+b.dataset.del); if (await SU.confirm(`Delete “${p.name}”?`, "Delete")) { SU.PRODUCTS = SU.PRODUCTS.filter(x => x.id !== p.id); SU.saveProducts(); view(); SU.toast("Deleted"); } });
+    }
+    if (tab === "orders") {
+      $("#oq").oninput = e => { oq = e.target.value; const pos = e.target.selectionStart; view(); const n = $("#oq"); n.focus(); n.setSelectionRange(pos, pos); };
+      $("#os").onchange = e => { os = e.target.value; view(); };
+      $$("[data-o]").forEach(b => b.onclick = () => orderDetail(b.dataset.o));
+    }
+    if (tab === "content") {
+      $("#pf").onsubmit = e => {
+        e.preventDefault(); const f = new FormData(e.target), code = f.get("code").toString().trim().toUpperCase(), val = +f.get("value");
+        if (!/^[A-Z0-9_-]{3,20}$/.test(code) || !(val > 0) || (f.get("type") === "percent" && val > 90)) { $("#pe").textContent = "Use 3–20 letters/digits and a valid value (percent ≤ 90)."; return; }
+        const pr = SU.ls.get("su_promos", {}); pr[code] = { type: f.get("type"), value: val }; SU.ls.set("su_promos", pr); SU.PROMOS[code] = pr[code]; view(); SU.toast(t("saved_ok"));
+      };
+      $$("[data-dp]").forEach(b => b.onclick = () => { const pr = SU.ls.get("su_promos", {}); delete pr[b.dataset.dp]; delete SU.PROMOS[b.dataset.dp]; SU.ls.set("su_promos", pr); view(); });
+    }
+  }
+  shell(); view();
+});
+</script>
+</body>
+</html>
